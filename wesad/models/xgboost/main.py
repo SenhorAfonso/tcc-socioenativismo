@@ -29,6 +29,7 @@ from shared.classification.metrics import (
     compute_metrics,
     print_aggregate_metrics,
     print_subject_metrics,
+    save_loso_csv,
 )
 from shared.classification.plots import plot_confusion_matrix, plot_per_class_metrics
 
@@ -53,18 +54,19 @@ def run_loso(
     X: pd.DataFrame,
     y: pd.Series,
     groups: pd.Series,
-) -> tuple[list[dict], list, list]:
+) -> tuple[list, list[dict], list, list]:
     """
     Run Leave-One-Subject-Out cross-validation with XGBoost.
 
     Returns
     -------
-    all_metrics : list of per-subject metric dicts.
-    all_trues   : accumulated ground-truth labels (0-indexed).
-    all_preds   : accumulated predictions (0-indexed).
+    subjects_order : list of subject IDs in evaluation order.
+    all_metrics    : list of per-subject metric dicts.
+    all_trues      : accumulated ground-truth labels (0-indexed).
+    all_preds      : accumulated predictions (0-indexed).
     """
     logo = LeaveOneGroupOut()
-    all_metrics, all_trues, all_preds = [], [], []
+    subjects_order, all_metrics, all_trues, all_preds = [], [], [], []
 
     for train_idx, test_idx in logo.split(X, y, groups=groups):
         X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
@@ -85,11 +87,12 @@ def run_loso(
         subj    = groups.iloc[test_idx[0]]
 
         print_subject_metrics(subj, metrics)
+        subjects_order.append(subj)
         all_metrics.append(metrics)
         all_trues.extend(y_test.values)
         all_preds.extend(preds)
 
-    return all_metrics, all_trues, all_preds
+    return subjects_order, all_metrics, all_trues, all_preds
 
 
 def main() -> None:
@@ -101,9 +104,10 @@ def main() -> None:
     y      = data["label"]
     groups = data["subject"]
 
-    all_metrics, all_trues, all_preds = run_loso(X, y, groups)
+    subjects_order, all_metrics, all_trues, all_preds = run_loso(X, y, groups)
 
     print_aggregate_metrics(all_metrics)
+    save_loso_csv(subjects_order, all_metrics, ROOT_DIR / "wesad" / "output" / "loso_xgboost.csv")
     plot_confusion_matrix(all_trues, all_preds, title="Matriz de Confusão Global – XGBoost (WESAD)")
     plot_per_class_metrics(all_trues, all_preds, title="Métricas por Classe – XGBoost (WESAD)")
 

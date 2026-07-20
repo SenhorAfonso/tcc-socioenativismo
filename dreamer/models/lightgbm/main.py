@@ -24,7 +24,12 @@ from sklearn.preprocessing import StandardScaler
 # Allow imports from the dreamer package root
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from models.shared.metrics import compute_metrics, print_aggregate_metrics, print_subject_metrics
+from models.shared.metrics import (
+    compute_metrics,
+    print_aggregate_metrics,
+    print_subject_metrics,
+    save_loso_csv,
+)
 from models.shared.plots import (
     build_results_df,
     plot_pearson_boxplot,
@@ -115,6 +120,13 @@ def main() -> None:
     subjects_order, all_metrics = run_loso(X_all, Y_all, groups, feature_cols)
 
     print_aggregate_metrics(all_metrics, DIM_NAMES, with_std=True)
+
+    save_loso_csv(
+        subjects_order,
+        all_metrics,
+        ["Val", "Aro", "Dom"],
+        ROOT_DIR / "dreamer" / "output" / "loso_lightgbm.csv",
+    )
 
     results_df = build_results_df(np.array(subjects_order), all_metrics)
     plot_pearson_heatmap_per_subject(

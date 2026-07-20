@@ -7,9 +7,9 @@ from Wireless Low-cost Off-the-Shelf Devices):
 - ECG device: Shimmer2 (256 Hz) — not used in this pipeline
 
 Affect labels (per video stimulus, self-reported):
-    ScoreValence   : 1–5
-    ScoreArousal   : 1–5
-    ScoreDominance : 1–5
+    ScoreValence   : 1-5
+    ScoreArousal   : 1-5
+    ScoreDominance : 1-5
 
 Expected directory layout:
     datasets/

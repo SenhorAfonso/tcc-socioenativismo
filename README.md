@@ -149,6 +149,42 @@ python dreamer/main.py
 
 ---
 
+## Multimodal Fusion & Modality Alignment
+
+To ensure a robust, realistic, and reproducible framework for affective computing, the modality alignment and fusion strategies are implemented as follows:
+
+### 1. WESAD — Symmetrical Feature-Level Early Fusion
+* **Strategy**: Direct deterministic temporal matching (early fusion / feature-level fusion).
+* **Implementation Details**: Sensor signals from chest (CHEST) and wrist (WRIST) are sliced in parallel using a unified reference 10-second window at 700 Hz. The signal slices are deterministic and aligned to the exact same physical timestamps of recording by calculating the sample rates ratio:
+  $$\text{start} = \left\lfloor \text{ref\_start} \times \frac{\text{window\_size}}{\text{ref\_window\_size}} \right\rfloor$$
+  $$\text{end} = \left\lfloor \text{ref\_end} \times \frac{\text{window\_size}}{\text{ref\_window\_size}} \right\rfloor$$
+* **Evidence in Code**: Implemented in [wesad/features.py](file:///C:/visualstudiocode/tcc/wesad/features.py#L101-L116) within `extract_window_features`, where chest and wrist signals are extracted synchronously and stored in the same feature row dict.
+* **Alternative Strategies**: No random pairing or late fusion algorithms are versioned or executed, ensuring all reported metrics are purely derived from sessional synchronous alignment.
+
+### 2. DREAMER — Unimodal Analysis
+* **Strategy**: Single-modality (EEG-only) features.
+* **Implementation Details**: The DREAMER ECG (Shimmer2) raw modality was discarded during pipeline engineering to focus exclusively on EEG spectral band powers and brain variation statistics.
+* **Evidence in Code**: Declared in [dreamer/config.py](file:///C:/visualstudiocode/tcc/dreamer/config.py#L7):
+  ```python
+  # - ECG device: Shimmer2 (256 Hz) — not used in this pipeline
+  ```
+
+---
+
+## Reproducibility & Determinism
+
+To guarantee 100% reproducibility of deep learning experiments:
+* **Global Seed**: `SEED = 42` is defined across PyTorch, NumPy, and Python built-in random generators.
+* **CuDNN Determinism**: CUDA operations are forced to run deterministically:
+  ```python
+  torch.backends.cudnn.deterministic = True
+  torch.backends.cudnn.benchmark = False
+  ```
+* **Evaluation Loop**: In each fold of Leave-One-Subject-Out (LOSO) cross-validation, models are trained and evaluated exactly **once** using this determinism seed.
+* **Auto-logging**: Metric evaluation files are automatically computed and outputted per-subject in CSV format.
+
+---
+
 ## Models
 
 All models use LOSO cross-validation: in each fold, one subject is held out as the test set and the model is trained from scratch on the remaining subjects. Features are standardized per fold using the training set statistics to prevent data leakage.
@@ -211,7 +247,30 @@ python dreamer/models/lightgbm/main.py
 
 ---
 
+### Multimodal Fusion (Transfer Learning)
+
+Task: predict valence, arousal, and dominance scores from a combination of EEG (DREAMER) and ECG (WESAD) pre-trained feature extractors.
+
+The pipeline:
+1. Validates that the preprocessed WESAD and DREAMER data exist.
+2. Checks for pre-trained ECG and EEG feature extractors (`wesag_model_gru.pth` and `dreamer_model_cnnbilstm.pth`). If missing, it trains them on the respective source datasets first.
+3. Extracts subject-independent latent embeddings for both datasets.
+4. Pairs the embeddings randomly and splits them into training/testing sets (80/20) to prevent data leakage.
+5. Trains a `HybridFusion` network to project both modalities into a joint latent space, using a consistency alignment regularization loss.
+6. Evaluates the fusion on valence, arousal, and dominance.
+7. Simulates a socio-enactive interaction environment based on the predicted emotional states.
+
+```bash
+python transfer_learning.py
+```
+
+---
+
 ## Output Files
+
+Executing preprocessing and model scripts automatically populates the corresponding `output/` folders.
+
+### Preprocessed Datasets
 
 **WESAD** — `wesad/output/`
 
@@ -228,3 +287,24 @@ python dreamer/models/lightgbm/main.py
 | `agg_bandpower_by_subject/sub_{id}_agg_bandpower.csv` | All videos aggregated per subject |
 | `dreamer_bandpower_all.csv` | All subjects merged |
 | `subject_bandpower_by_video/brain_variation_per_video.csv` | Per-video statistics across all subjects |
+
+### Leave-One-Subject-Out (LOSO) CSV Logs
+
+To support research transparency, subject-level validation metrics (including accuracy, macro F1, macro precision, and macro recall for WESAD, and MAE, RMSE, R², and Pearson r for DREAMER) are exported to CSV files upon model completion:
+
+* **WESAD**:
+  * `wesad/output/loso_gru.csv`: Per-subject results for GRU.
+  * `wesad/output/loso_lightgbm.csv`: Per-subject results for LightGBM.
+  * `wesad/output/loso_xgboost.csv`: Per-subject results for XGBoost.
+* **DREAMER**:
+  * `dreamer/output/loso_cnnbilstm.csv`: Per-subject results for CNN-BiLSTM.
+  * `dreamer/output/loso_lightgbm.csv`: Per-subject results for LightGBM.
+
+### Multimodal Fusion Logs & Visualizations
+
+Running `transfer_learning.py` generates the following files in `transfer_learning_output/`:
+* `transfer_learning_metrics.csv`: Performance metrics (MAE, RMSE, R², Pearson correlation) per dimension.
+* `transfer_learning_metrics.png`: Visual heatmap of the performance metrics.
+* `simulation_log.txt`: Detailed log of the socio-enactive simulated environment interaction.
+* `transfer_learning_simulation.png`: Time-series plot of Valence and Arousal evolution during the simulation.
+

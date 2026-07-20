@@ -57,8 +57,9 @@ def extract_dataset() -> None:
         )
 
     print(f"Extracting {DREAMER_ZIP} ...")
+    DREAMER_EXTRACTED_DIR.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(DREAMER_ZIP, "r") as zf:
-        zf.extractall(DREAMER_ZIP.parent)
+        zf.extractall(DREAMER_EXTRACTED_DIR)
     print("Extraction complete.")
 
 

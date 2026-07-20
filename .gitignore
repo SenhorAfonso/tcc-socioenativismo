@@ -1,0 +1,10 @@
+WESAD.zip
+DREAMER.zip
+**/*.csv
+**/*.zip
+**/*.txt
+**/*.pkl
+**/*.png
+*.pth
+*.pdf
+*.mat

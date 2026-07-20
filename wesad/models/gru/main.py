@@ -10,6 +10,7 @@ Expected input file (produced by the WESAD preprocessing pipeline):
     wesad/output/final_wesad.csv
 """
 
+import random
 import sys
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from shared.classification.metrics import (
     compute_metrics,
     print_aggregate_metrics,
     print_subject_metrics,
+    save_loso_csv,
 )
 from shared.classification.plots import plot_confusion_matrix, plot_per_class_metrics
 from wesad.models.gru.dataset import PhysioDataset
@@ -49,6 +51,16 @@ STRIDE     = 5
 LR         = 1e-3
 WEIGHT_DECAY = 1e-4
 NUM_WORKERS  = 2
+SEED         = 42
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def train_epoch(
@@ -94,16 +106,18 @@ def run_loso(
     num_features: int,
     num_classes: int,
     device: torch.device,
-) -> tuple[list[dict], list[int], list[int]]:
+) -> tuple[list, list[dict], list[int], list[int]]:
     """
     Run Leave-One-Subject-Out cross-validation.
 
     Returns
     -------
-    all_metrics : list of per-subject metric dicts.
-    all_trues   : accumulated ground-truth labels across all folds.
-    all_preds   : accumulated predictions across all folds.
+    subjects_order : list of subject IDs in evaluation order.
+    all_metrics    : list of per-subject metric dicts.
+    all_trues      : accumulated ground-truth labels across all folds.
+    all_preds      : accumulated predictions across all folds.
     """
+    subjects_order: list = []
     all_metrics: list[dict] = []
     all_trues:   list[int]  = []
     all_preds:   list[int]  = []
@@ -146,14 +160,16 @@ def run_loso(
         metrics = compute_metrics(trues, preds)
 
         print_subject_metrics(test_subject, metrics)
+        subjects_order.append(test_subject)
         all_metrics.append(metrics)
         all_trues.extend(trues)
         all_preds.extend(preds)
 
-    return all_metrics, all_trues, all_preds
+    return subjects_order, all_metrics, all_trues, all_preds
 
 
 def main() -> None:
+    set_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
@@ -165,11 +181,12 @@ def main() -> None:
     num_features = len(features)
     num_classes  = data["label"].nunique()
 
-    all_metrics, all_trues, all_preds = run_loso(
+    subjects_order, all_metrics, all_trues, all_preds = run_loso(
         data, features, subjects, num_features, num_classes, device
     )
 
     print_aggregate_metrics(all_metrics)
+    save_loso_csv(subjects_order, all_metrics, ROOT_DIR / "wesad" / "output" / "loso_gru.csv")
     plot_confusion_matrix(all_trues, all_preds, title="Matriz de Confusão Global – GRU (WESAD)")
     plot_per_class_metrics(all_trues, all_preds, title="Métricas por Classe – GRU (WESAD)")
 
