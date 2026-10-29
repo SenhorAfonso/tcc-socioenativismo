@@ -488,6 +488,10 @@ def main() -> None:
         run_preprocess_dreamer()
 
     # 2. Weights Pre-training Check
+    # NOTE (methodological): the frozen base encoders used below are trained ONCE on all subjects of
+    # their datasets (train_and_save_*_model); they are not retrained within each fold. The LOSO loop
+    # in step 7 therefore applies to the fusion network only, and the fusion results are not strictly
+    # subject-independent at the encoder level (see README, "Notes on the fusion experiment").
     ecg_weights_path = ROOT_DIR / "wesag_model_gru.pth"
     # Fallback to alternative names if exists
     if not ecg_weights_path.exists() and (ROOT_DIR / "wesad_model_gru.pth").exists():
@@ -799,7 +803,7 @@ def main() -> None:
     env = SimulatedEnvironment()
     policy = SimplePolicy(env.actions)
 
-    log = simulate_interaction(final_hybrid, env, policy, n_steps=100)
+    log = simulate_interaction(final_hybrid, env, policy, n_steps=30)  # 30 iterations, matching the manuscript
 
     # Write simulation log
     with open(output_dir / "simulation_log.txt", "w", encoding="utf-8") as f:
@@ -810,11 +814,13 @@ def main() -> None:
     # Plot simulation states
     states = np.array([s for _, s, _, _, _ in log])
     plt.figure(figsize=(10, 5))
-    plt.plot(states[:, 0], label='Valence', color='blue', linewidth=2)
-    plt.plot(states[:, 1], label='Arousal', color='red', linewidth=2)
+    plt.plot(states[:, 0], label='Valence', color='blue', linewidth=2, marker='o', markersize=4)
+    plt.plot(states[:, 1], label='Arousal', color='red', linewidth=2, marker='s', markersize=4)
+    plt.plot(states[:, 2], label='Dominance', color='green', linewidth=2, marker='^', markersize=4)  # now plotted, matching the manuscript
     plt.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5)
     plt.legend()
-    plt.title("Evolution of Simulated Affective States (Multimodal Fusion)")
+    plt.ylim(0, 1)
+    plt.title("Evolution of Simulated Affective States over 30 Enactive Iterations")
     plt.xlabel("Interaction Steps")
     plt.ylabel("State Level")
     plt.tight_layout()

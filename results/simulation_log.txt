@@ -1,0 +1,30 @@
+Step 00 | State: [0.25 0.9  0.55] | Action: sound- | New: [0.28 0.8  0.55] | Reward: +0.130
+Step 01 | State: [0.3  0.79 0.56] | Action: sound- | New: [0.33 0.69 0.56] | Reward: +0.130
+Step 02 | State: [0.32 0.67 0.51] | Action: light+ | New: [0.37 0.72 0.51] | Reward: -0.000
+Step 03 | State: [0.39 0.7  0.52] | Action: light+ | New: [0.44 0.75 0.52] | Reward: -0.000
+Step 04 | State: [0.43 0.71 0.5 ] | Action: sound- | New: [0.46 0.61 0.5 ] | Reward: +0.130
+Step 05 | State: [0.47 0.59 0.51] | Action: none   | New: [0.47 0.59 0.51] | Reward: +0.000
+Step 06 | State: [0.46 0.61 0.51] | Action: none   | New: [0.46 0.61 0.51] | Reward: +0.000
+Step 07 | State: [0.44 0.61 0.49] | Action: none   | New: [0.44 0.61 0.49] | Reward: +0.000
+Step 08 | State: [0.42 0.61 0.48] | Action: none   | New: [0.42 0.61 0.48] | Reward: +0.000
+Step 09 | State: [0.45 0.6  0.48] | Action: none   | New: [0.45 0.6  0.48] | Reward: +0.000
+Step 10 | State: [0.41 0.58 0.49] | Action: none   | New: [0.41 0.58 0.49] | Reward: +0.000
+Step 11 | State: [0.41 0.59 0.54] | Action: none   | New: [0.41 0.59 0.54] | Reward: +0.000
+Step 12 | State: [0.42 0.6  0.59] | Action: none   | New: [0.42 0.6  0.59] | Reward: +0.000
+Step 13 | State: [0.44 0.57 0.6 ] | Action: none   | New: [0.44 0.57 0.6 ] | Reward: +0.000
+Step 14 | State: [0.41 0.55 0.61] | Action: none   | New: [0.41 0.55 0.61] | Reward: +0.000
+Step 15 | State: [0.39 0.56 0.62] | Action: light+ | New: [0.44 0.61 0.62] | Reward: -0.000
+Step 16 | State: [0.42 0.61 0.65] | Action: none   | New: [0.42 0.61 0.65] | Reward: +0.000
+Step 17 | State: [0.4  0.58 0.66] | Action: light+ | New: [0.45 0.63 0.66] | Reward: -0.000
+Step 18 | State: [0.45 0.63 0.67] | Action: none   | New: [0.45 0.63 0.67] | Reward: +0.000
+Step 19 | State: [0.47 0.61 0.68] | Action: none   | New: [0.47 0.61 0.68] | Reward: +0.000
+Step 20 | State: [0.47 0.61 0.73] | Action: none   | New: [0.47 0.61 0.73] | Reward: +0.000
+Step 21 | State: [0.45 0.62 0.71] | Action: none   | New: [0.45 0.62 0.71] | Reward: +0.000
+Step 22 | State: [0.48 0.63 0.71] | Action: none   | New: [0.48 0.63 0.71] | Reward: +0.000
+Step 23 | State: [0.5  0.63 0.69] | Action: none   | New: [0.5  0.63 0.69] | Reward: +0.000
+Step 24 | State: [0.52 0.63 0.68] | Action: none   | New: [0.52 0.63 0.68] | Reward: +0.000
+Step 25 | State: [0.51 0.62 0.69] | Action: none   | New: [0.51 0.62 0.69] | Reward: +0.000
+Step 26 | State: [0.5  0.61 0.66] | Action: none   | New: [0.5  0.61 0.66] | Reward: +0.000
+Step 27 | State: [0.56 0.59 0.65] | Action: none   | New: [0.56 0.59 0.65] | Reward: +0.000
+Step 28 | State: [0.56 0.56 0.63] | Action: none   | New: [0.56 0.56 0.63] | Reward: +0.000
+Step 29 | State: [0.56 0.58 0.61] | Action: none   | New: [0.56 0.58 0.61] | Reward: +0.000

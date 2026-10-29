@@ -1,6 +1,6 @@
 # Physiological Signal Processing for Affective Computing
 
-This repository contains the full data preprocessing and machine learning pipeline developed for a study on automatic emotion and stress recognition from physiological signals. Two publicly available datasets are used: **WESAD** (stress classification from wearable sensors) and **DREAMER** (continuous affect prediction from EEG).
+This repository contains the full data preprocessing and machine learning pipeline developed for a study on automatic emotion and stress recognition from physiological signals. It is the companion code of the manuscript *"Enactive Knowledge Creation in Physiological Computing: A Proof-of-Concept Architecture"* (submitted to *Cognitive Computation*). Two benchmark datasets are used: **WESAD** (stress classification from wearable sensors; public download) and **DREAMER** (continuous affect prediction from EEG; available on request, see [Data access](#data-access)).
 
 All models are evaluated under a **Leave-One-Subject-Out (LOSO)** cross-validation scheme, which simulates a subject-independent scenario — the most realistic and challenging setting for affective computing research.
 
@@ -13,6 +13,13 @@ All models are evaluated under a **Leave-One-Subject-Out (LOSO)** cross-validati
 ├── datasets/                        # Raw dataset archives (not versioned)
 │   ├── WESAD.zip
 │   └── DREAMER.zip
+│
+├── results/                         # Curated outputs accompanying the manuscript
+├── transfer_learning.py             # Cross-dataset fusion feasibility test + rule-based simulation
+├── extract_loso_metrics.py          # Summarizes WESAD per-subject LOSO CSVs
+├── extract_table4.py                # Summarizes DREAMER/fusion per-subject CSVs
+├── requirements.txt
+├── LICENSE
 │
 ├── shared/                          # Cross-dataset utilities
 │   └── classification/
@@ -78,7 +85,7 @@ Signals: ACC, ECG, EMG, EDA, Temperature, Respiration (chest); ACC, BVP, EDA, Te
 
 A dataset for continuous emotion recognition collected from 23 subjects using an Emotiv EPOC EEG headset (14 channels, 128 Hz) while participants watched 18 video clips. Affect is self-reported on three dimensions using the Self-Assessment Manikin (SAM) scale (1–5).
 
-- **Article:** [Katsigiannis & Ramzan, 2018 — IEEE TNSRE](https://ieeexplore.ieee.org/document/7887697)
+- **Article:** [Katsigiannis & Ramzan, 2018 — IEEE J Biomed Health Inform 22(1):98-107](https://ieeexplore.ieee.org/document/7887697)
 - **Download:** [Zenodo — Record 546113](https://zenodo.org/records/546113)
 
 > **Access note:** DREAMER files are restricted on Zenodo. To request access, submit your name, e-mail, institution, position, and reason for requesting the database on the Zenodo record page.
@@ -135,7 +142,7 @@ python dreamer/main.py
 1. Loads each subject's `.pkl` file.
 2. Slides a non-overlapping 10-second window (7000 samples at 700 Hz) over the recording.
 3. Discards windows with mixed or invalid labels.
-4. Computes statistical aggregates (std, min, max) per channel per window.
+4. Computes statistical aggregates (sum, std, min, max) per channel per window (56 features per window after splitting the accelerometer axes).
 5. Decomposes 3-axis ACC arrays into x/y/z columns.
 6. Outputs `wesad/output/final_wesad.csv`.
 
@@ -158,13 +165,13 @@ To ensure a robust, realistic, and reproducible framework for affective computin
 * **Implementation Details**: Sensor signals from chest (CHEST) and wrist (WRIST) are sliced in parallel using a unified reference 10-second window at 700 Hz. The signal slices are deterministic and aligned to the exact same physical timestamps of recording by calculating the sample rates ratio:
   $$\text{start} = \left\lfloor \text{ref\_start} \times \frac{\text{window\_size}}{\text{ref\_window\_size}} \right\rfloor$$
   $$\text{end} = \left\lfloor \text{ref\_end} \times \frac{\text{window\_size}}{\text{ref\_window\_size}} \right\rfloor$$
-* **Evidence in Code**: Implemented in [wesad/features.py](file:///C:/visualstudiocode/tcc/wesad/features.py#L101-L116) within `extract_window_features`, where chest and wrist signals are extracted synchronously and stored in the same feature row dict.
-* **Alternative Strategies**: No random pairing or late fusion algorithms are versioned or executed, ensuring all reported metrics are purely derived from sessional synchronous alignment.
+* **Evidence in Code**: Implemented in [wesad/features.py](wesad/features.py#L101-L116) within `extract_window_features`, where chest and wrist signals are extracted synchronously and stored in the same feature row dict.
+* **Scope of this statement**: it concerns the WESAD pipeline and the WESAD/DREAMER unimodal models only, whose chest and wrist features are aligned synchronously. The separate cross-dataset fusion experiment (`transfer_learning.py`) does use **random cross-dataset pairing** of EEG (DREAMER) and peripheral-signal (WESAD) embeddings; it is a feasibility test of the fusion mechanism, not a synchronized multimodal baseline (see [Notes on the fusion experiment](#notes-on-the-fusion-experiment)).
 
 ### 2. DREAMER — Unimodal Analysis
 * **Strategy**: Single-modality (EEG-only) features.
 * **Implementation Details**: The DREAMER ECG (Shimmer2) raw modality was discarded during pipeline engineering to focus exclusively on EEG spectral band powers and brain variation statistics.
-* **Evidence in Code**: Declared in [dreamer/config.py](file:///C:/visualstudiocode/tcc/dreamer/config.py#L7):
+* **Evidence in Code**: Declared in [dreamer/config.py](dreamer/config.py#L7):
   ```python
   # - ECG device: Shimmer2 (256 Hz) — not used in this pipeline
   ```
@@ -207,7 +214,7 @@ python wesad/models/gru/main.py
 
 #### LightGBM
 
-A gradient boosting classifier trained on flat per-window feature vectors. `sum` features are excluded based on empirical results showing improved performance without them. Class weights are balanced to account for the uneven distribution of affective states.
+A gradient boosting classifier trained on flat per-window feature vectors. The per-channel `sum` features (14 of the 56) are excluded for LightGBM based on empirical results showing improved performance without them; XGBoost and the GRU use all 56 features. Class weights are balanced to account for the uneven distribution of affective states.
 
 ```bash
 python wesad/models/lightgbm/main.py
@@ -215,7 +222,7 @@ python wesad/models/lightgbm/main.py
 
 #### XGBoost
 
-Same setup as LightGBM. Labels are shifted to 0-indexed as required by XGBoost's internal representation.
+Same LOSO protocol as LightGBM, but using all 56 features (no `sum` exclusion). Labels are shifted to 0-indexed as required by XGBoost's internal representation.
 
 ```bash
 python wesad/models/xgboost/main.py
@@ -254,11 +261,17 @@ Task: predict valence, arousal, and dominance scores from a combination of EEG (
 The pipeline:
 1. Validates that the preprocessed WESAD and DREAMER data exist.
 2. Checks for pre-trained ECG and EEG feature extractors (`wesag_model_gru.pth` and `dreamer_model_cnnbilstm.pth`). If missing, it trains them on the respective source datasets first.
-3. Extracts subject-independent latent embeddings for both datasets.
-4. Pairs the embeddings randomly and splits them into training/testing sets (80/20) to prevent data leakage.
-5. Trains a `HybridFusion` network to project both modalities into a joint latent space, using a consistency alignment regularization loss.
-6. Evaluates the fusion on valence, arousal, and dominance.
-7. Simulates a socio-enactive interaction environment based on the predicted emotional states.
+3. Extracts latent embeddings (penultimate layer) of the frozen encoders for all subjects of both datasets.
+4. Pairs the embeddings **randomly across datasets** (EEG embeddings from DREAMER, peripheral-signal embeddings from WESAD; no within-subject or temporal correspondence).
+5. Trains a `HybridFusion` network to project both modalities into a joint latent space (256-d), using an MSE alignment term with `lambda_align = 0.01`.
+6. Evaluates the fusion network with leave-one-subject-out folds over the paired embeddings (grouped by the DREAMER subject) on valence, arousal, and dominance, and writes per-fold metrics to `transfer_learning_loso_folds.csv`.
+7. Trains a final fusion network on 100% of the paired data and runs a 30-iteration **rule-based** simulation (see below).
+
+#### Notes on the fusion experiment
+
+* **Feasibility test only.** Random cross-dataset pairing means the experiment tests whether the fusion network can be trained and evaluated end to end; it does not establish whether genuine within-subject multimodal fusion would help. DREAMER contains ECG, but its ECG signals are not used in this repository (`dreamer/config.py`), so a synchronized within-dataset EEG–ECG baseline was **not** evaluated.
+* **Encoders are trained once, on all subjects.** `train_and_save_ecg_model` and `train_and_save_eeg_model` (15 epochs each) fit the base encoders on all subjects, and the LOSO loop of step 6 applies to the fusion network only. The held-out subject's data (and, for the EEG encoder, ratings) were therefore seen by the frozen encoders, so the fusion results are not strictly subject-independent at the encoder level and are not strictly comparable with the fold-wise unimodal results. Fold-wise retraining of the encoders is needed for a strictly subject-independent fusion evaluation. The encoder weights (`*.pth`) are not versioned.
+* **Simulation.** The environment (`SimulatedEnvironment`) and `SimplePolicy` are a predefined rule-based controller with stochastic exploration: `arousal > 0.7` -> `sound-`; `valence < 0.4` -> `light+`; `arousal < 0.3` -> `sound+`; otherwise no action; with probability 0.1 a uniformly random action is taken. The thresholds are hard-coded and the policy does not learn. The simulated state is passed directly to the policy and the fusion network is not queried during the simulation (no knowledge-base module is implemented). The log used in the manuscript (30 iterations) is in [`results/simulation_log.txt`](results/simulation_log.txt).
 
 ```bash
 python transfer_learning.py
@@ -304,7 +317,32 @@ To support research transparency, subject-level validation metrics (including ac
 
 Running `transfer_learning.py` generates the following files in `transfer_learning_output/`:
 * `transfer_learning_metrics.csv`: Performance metrics (MAE, RMSE, R², Pearson correlation) per dimension.
+* `transfer_learning_loso_folds.csv`: Per-subject (fold-level) metrics of the fusion network.
 * `transfer_learning_metrics.png`: Visual heatmap of the performance metrics.
 * `simulation_log.txt`: Detailed log of the socio-enactive simulated environment interaction.
-* `transfer_learning_simulation.png`: Time-series plot of Valence and Arousal evolution during the simulation.
+* `transfer_learning_simulation.png`: Time-series plot of Valence, Arousal and Dominance during the 30-iteration simulation.
 
+---
+
+## Data access
+
+* **WESAD** is publicly available: <https://ubi29.informatik.uni-siegen.de/usi/data_wesad.html>.
+* **DREAMER** is distributed on request by its maintainers (Zenodo record 546113, <https://zenodo.org/records/546113>); the raw files are not redistributed here.
+* Place the archives in `datasets/` (see [Setup](#setup)). Raw data, intermediate CSV files and model weights are not versioned.
+
+## Reproducing the manuscript results
+
+1. Install the dependencies (`pip install -r requirements.txt`; versions documented in the manuscript are pinned: Python 3.12, PyTorch 2.8.0, scikit-learn 1.6.1, NumPy 2.0.2, Pandas 2.2.2).
+2. Run the preprocessing: `python wesad/main.py` and `python dreamer/main.py`.
+3. Run the unimodal LOSO experiments (WESAD: GRU, LightGBM, XGBoost; DREAMER: CNN-BiLSTM, LightGBM), then `python extract_loso_metrics.py` and `python extract_table4.py` (DREAMER unimodal vs. fusion; corresponds to Table 3 of the manuscript) to summarize the per-subject CSV logs.
+4. Run the fusion feasibility experiment and simulation: `python transfer_learning.py`.
+
+All stochastic components use `SEED = 42`; each fold is run once. Summary statistics in the manuscript use the population standard deviation (denominator *n*) across folds; the reported 95% confidence intervals describe each model's own mean and were derived from the rounded summaries (Student's *t*), not from the per-fold files. The manuscript reports no paired significance tests; `analysis/paired_stats.py` computes paired differences, confidence intervals and Wilcoxon tests from the per-fold logs (see `analysis/`).
+
+## Results folder
+
+[`results/`](results/) holds the curated outputs that accompany the manuscript. See [`results/README.md`](results/README.md) for what is included and how to regenerate the remaining files.
+
+## License
+
+Released under the MIT License (see [`LICENSE`](LICENSE)).

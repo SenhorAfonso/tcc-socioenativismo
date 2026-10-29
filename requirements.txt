@@ -1,0 +1,13 @@
+# Versions documented in the manuscript (Google Colab Pro, Python 3.12):
+numpy==2.0.2
+pandas==2.2.2
+scikit-learn==1.6.1
+torch==2.8.0
+# Versions pinned from the local execution environment (pip freeze):
+scipy==1.18.0
+neurokit2==0.2.13
+lightgbm==4.6.0
+xgboost==3.3.0
+seaborn==0.13.2
+matplotlib==3.11.0
+tqdm==4.68.4
