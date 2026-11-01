@@ -1,8 +1,8 @@
 # Fold-wise Encoder Retraining — Multimodal Fusion (`transfer_learning.py`)
 
-In the original [`transfer_learning.py`](../transfer_learning.py), the frozen base encoders (`PhysioGRUEncoder` on WESAD and `CNNBiLSTM` on DREAMER) are trained once on all subjects (15 epochs each), and the 23-fold LOSO loop applies only to the `HybridFusion` network.
+In the original [`transfer_learning.py`](../../transfer_learning.py), the frozen base encoders (`PhysioGRUEncoder` on WESAD and `CNNBiLSTM` on DREAMER) are trained once on all subjects (15 epochs each), and the 23-fold LOSO loop applies only to the `HybridFusion` network.
 
-This folder contains the strictly out-of-fold evaluation where both base encoders are retrained from scratch inside each LOSO fold (15 folds for the WESAD GRU encoder with per-fold `StandardScaler`, and 23 folds for the DREAMER CNN-BiLSTM encoder, 15 epochs per fold, `SEED = 42`) before extracting the test subject's embeddings and running the 23-fold `HybridFusion` LOSO evaluation.
+This folder contains the stricter fold-wise evaluation where both base encoders are retrained from scratch inside each LOSO fold (15 folds for the WESAD GRU encoder with per-fold `StandardScaler`, and 23 folds for the DREAMER CNN-BiLSTM encoder, 15 epochs per fold, `SEED = 42`) before extracting the test subject's embeddings and running the 23-fold `HybridFusion` LOSO evaluation. The held-out subject's embeddings come from an encoder that did not see that subject. The variant is not fully nested, however: the embeddings used to train the fusion network on the other subjects came from fold encoders that had seen the held-out subject.
 
 ## Execution Time (CPU — 13th Gen Intel Core i7-13650HX)
 - **WESAD GRU encoder (15 folds, 15 epochs/fold):** `91.2 s`
@@ -15,6 +15,10 @@ This folder contains the strictly out-of-fold evaluation where both base encoder
 - [`paired_stats_dreamer_foldwise_descriptives.csv`](paired_stats_dreamer_foldwise_descriptives.csv): Recomputed per-model descriptive statistics (`CNN-BiLSTM` vs. `Fusion_Foldwise`).
 - [`paired_stats_dreamer_foldwise.csv`](paired_stats_dreamer_foldwise.csv): Paired comparisons (`Fusion_Foldwise - CNN-BiLSTM`) with 95% Student's *t* CI, 95% percentile bootstrap CI, two-sided Wilcoxon signed-rank *p*, Holm-adjusted *p*, and paired Cohen's $d_z$.
 - [`run_foldwise_fusion.py`](run_foldwise_fusion.py): Script used to run the fold-wise encoder retraining and LOSO fusion evaluation.
+
+## Reproduction
+
+The published per-subject CSV is sufficient to recompute the descriptive and paired statistics without retraining. From the repository root, run `python analysis/paired_stats.py`; the routine processes the main and fold-wise fusion variants together. To regenerate the fold-wise experimental log itself, run `python results/foldwise_encoders/run_foldwise_fusion.py` with the preprocessed datasets available. This retrains the models and is not required for the statistical verification.
 
 ## Terminal Output
 

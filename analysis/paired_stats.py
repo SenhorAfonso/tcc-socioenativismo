@@ -1,19 +1,29 @@
-"""Paired between-model comparisons from the per-subject (fold-level) LOSO logs.
+"""Paired between-model comparisons from the published per-subject LOSO logs.
 
-Reads the CSV files written by the experiment scripts (rows beginning with '#' are ignored):
-  WESAD   : wesad/output/loso_gru.csv, loso_lightgbm.csv, loso_xgboost.csv   (columns: subject, accuracy, f1, ...)
-  DREAMER : dreamer/output/loso_cnnbilstm.csv                                (columns: subject, MAE_<dim>, R2_<dim>, ...)
-            transfer_learning_output/transfer_learning_loso_folds.csv        (long format: Subject, Dimension, MAE, RMSE, R², r)
+The script reads the curated CSV files directly from ``results/`` (rows beginning
+with '#' are ignored); no copies to the model output directories are required:
+  WESAD   : results/wesad_loso_{gru,lightgbm,xgboost}.csv
+            (columns: subject, accuracy, f1, ...)
+  DREAMER : results/dreamer_loso_cnnbilstm.csv
+            (columns: subject, MAE_<dim>, R2_<dim>, ...)
+  Fusion  : results/fusion_loso_folds.csv
+  Fold-wise fusion: results/foldwise_encoders/fusion_loso_folds_foldwise.csv
+            (long format: Subject, Dimension, MAE, RMSE, R², r)
 
-For every pre-specified comparison it reports, over the paired subjects:
-  mean difference, 95% CI (Student's t on the per-subject differences), 95% percentile-bootstrap CI,
-  Wilcoxon signed-rank p (two-sided), Holm-adjusted p within each family, and Cohen's dz.
-It also recomputes each model's mean, SD (population and sample) and 95% t-CI from the raw per-subject values,
-so they can be checked against Tables 2 and 3 of the manuscript.
+For every specified comparison it reports, over the paired subjects:
+  mean difference, 95% CI (Student's t on the per-subject differences),
+  95% percentile-bootstrap CI (10,000 resamples), two-sided Wilcoxon
+  signed-rank p, Holm-adjusted p within each family, and Cohen's dz.
+It also recomputes each model's mean, population and sample SD, and 95% t-CI
+from the raw per-subject values, so they can be checked against the manuscript.
 
 Usage (from the repository root):
-    python analysis/paired_stats.py            # writes results/paired_stats_wesad.csv and results/paired_stats_dreamer.csv
-No data are simulated or altered; the script fails if a file is missing or subjects cannot be paired.
+    python analysis/paired_stats.py
+    python analysis/paired_stats.py . /temporary/output/directory
+
+The second form writes the same six CSV outputs to a separate directory for
+verification without overwriting the curated outputs. No data are simulated or
+altered; the script fails if a file is missing or subjects cannot be paired.
 """
 import sys
 from itertools import combinations
@@ -88,8 +98,8 @@ def compare(a_name, a, b_name, b, metric):
 
 
 def wesad(root):
-    files = {"GRU": "loso_gru.csv", "LightGBM": "loso_lightgbm.csv", "XGBoost": "loso_xgboost.csv"}
-    data = {m: read_csv(root / "wesad" / "output" / f) for m, f in files.items()}
+    files = {"GRU": "wesad_loso_gru.csv", "LightGBM": "wesad_loso_lightgbm.csv", "XGBoost": "wesad_loso_xgboost.csv"}
+    data = {m: read_csv(root / "results" / f) for m, f in files.items()}
     desc, comps = [], []
     for metric in ("accuracy", "f1"):
         series = {m: df.set_index(df["subject"].astype(str))[metric] for m, df in data.items()}
@@ -102,9 +112,11 @@ def wesad(root):
     return pd.DataFrame(desc), pd.DataFrame(comps)
 
 
-def dreamer(root):
-    uni = read_csv(root / "dreamer" / "output" / "loso_cnnbilstm.csv")
-    fus = read_csv(root / "transfer_learning_output" / "transfer_learning_loso_folds.csv")
+def dreamer(root, fusion_path=None, fusion_name="Fusion"):
+    uni = read_csv(root / "results" / "dreamer_loso_cnnbilstm.csv")
+    if fusion_path is None:
+        fusion_path = root / "results" / "fusion_loso_folds.csv"
+    fus = read_csv(fusion_path)
     uni = uni.set_index(uni["subject"].astype(str))
     dims = {"Valence": "Val", "Arousal": "Aro", "Dominance": "Dom"}
     desc, comps = [], []
@@ -114,8 +126,8 @@ def dreamer(root):
             u = uni[ucol.format(short)]
             f = fus[fus["Dimension"] == dim].set_index(fus[fus["Dimension"] == dim]["Subject"].astype(str))[fcol]
             desc += [dict(metric=f"{metric}_{dim}", **describe("CNN-BiLSTM", u.to_numpy())),
-                     dict(metric=f"{metric}_{dim}", **describe("Fusion", f.to_numpy()))]
-            rows.append(compare("Fusion", f, "CNN-BiLSTM", u, f"{metric}_{dim}"))
+                     dict(metric=f"{metric}_{dim}", **describe(fusion_name, f.to_numpy()))]
+            rows.append(compare(fusion_name, f, "CNN-BiLSTM", u, f"{metric}_{dim}"))
         adj = holm([r["wilcoxon_p"] for r in rows])
         for r, q in zip(rows, adj):
             r["wilcoxon_p_holm"] = q
@@ -123,16 +135,31 @@ def dreamer(root):
     return pd.DataFrame(desc), pd.DataFrame(comps)
 
 
+def dreamer_foldwise(root):
+    return dreamer(
+        root,
+        fusion_path=root / "results" / "foldwise_encoders" / "fusion_loso_folds_foldwise.csv",
+        fusion_name="Fusion_Foldwise",
+    )
+
+
+def write_analysis(root, out, name, fn, foldwise=False):
+    d, c = fn(root)
+    target = out / "foldwise_encoders" if foldwise else out
+    target.mkdir(parents=True, exist_ok=True)
+    d.to_csv(target / f"paired_stats_{name}_descriptives.csv", index=False)
+    c.to_csv(target / f"paired_stats_{name}.csv", index=False)
+    print(f"\n=== {name.upper()}: per-model descriptives (recomputed from per-subject values) ===")
+    print(d.round(3).to_string(index=False))
+    print(f"\n=== {name.upper()}: paired comparisons ===")
+    print(c.round(4).to_string(index=False))
+
+
 if __name__ == "__main__":
-    root = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT
-    out = root / "results"
-    out.mkdir(exist_ok=True)
+    root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT
+    out = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else root / "results"
+    out.mkdir(parents=True, exist_ok=True)
     pd.set_option("display.width", 200, "display.max_columns", 30)
-    for name, fn in (("wesad", wesad), ("dreamer", dreamer)):
-        d, c = fn(root)
-        d.to_csv(out / f"paired_stats_{name}_descriptives.csv", index=False)
-        c.to_csv(out / f"paired_stats_{name}.csv", index=False)
-        print(f"\n=== {name.upper()}: per-model descriptives (recomputed from per-subject values) ===")
-        print(d.round(3).to_string(index=False))
-        print(f"\n=== {name.upper()}: paired comparisons ===")
-        print(c.round(4).to_string(index=False))
+    write_analysis(root, out, "wesad", wesad)
+    write_analysis(root, out, "dreamer", dreamer)
+    write_analysis(root, out, "dreamer_foldwise", dreamer_foldwise, foldwise=True)
