@@ -334,7 +334,7 @@ Running `transfer_learning.py` generates the following files in `transfer_learni
 
 The curated per-subject CSVs required for statistical verification are already included in [`results/`](results/), so the descriptive and paired analyses can be reproduced without retraining the deep models.
 
-1. Install the dependencies (`pip install -r requirements.txt`; versions documented in the manuscript are pinned: Python 3.12, PyTorch 2.8.0, scikit-learn 1.6.1, NumPy 2.0.2, Pandas 2.2.2).
+1. Install the dependencies (`pip install -r requirements.txt`; versions used in the reported experiments are pinned: Python 3.12, PyTorch 2.8.0, scikit-learn 1.6.1, NumPy 2.0.2, Pandas 2.2.2).
 2. To regenerate the experimental logs, run the preprocessing: `python wesad/main.py` and `python dreamer/main.py`.
 3. Run the unimodal LOSO experiments (WESAD: GRU, LightGBM, XGBoost; DREAMER: CNN-BiLSTM, LightGBM), then `python extract_loso_metrics.py` and `python extract_table4.py` (DREAMER unimodal vs. fusion; corresponds to Table 4 of the manuscript) to summarize the per-subject CSV logs.
 4. Run the main fusion feasibility experiment and simulation: `python transfer_learning.py`. In this variant, LOSO applies only to the fusion network because the encoders were trained once on all subjects.
